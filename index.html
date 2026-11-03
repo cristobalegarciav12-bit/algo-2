@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Strike Realista 3D — FPS</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="game"></div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="crosshair"><div class="dot"></div><div class="l t"></div><div class="l b"></div><div class="l l"></div><div class="l r"></div></div>
+  <div id="hitmarker"></div>
+  <div id="damage-vignette"></div>
+  <div id="heal-flash"></div>
+  <div id="flash-overlay"></div>
+  <div id="scope-glass"></div>
+  <div id="topbar">
+    <div id="wave-box">OLEADA <span id="wave">1</span> &nbsp;•&nbsp; 👥 <span id="enemies-left">0</span> &nbsp;•&nbsp; ☠️ <span id="kills">0</span> &nbsp;•&nbsp; 🎯 <span id="score">0</span></div>
+    <div id="timer">00:00</div>
+  </div>
+  <div id="bottom-left">
+    <div id="hp-bar"><div id="hp-fill"></div><span id="hp-text">100</span></div>
+    <div id="stance">WASD moverse • SHIFT correr • ESPACIO saltar • C agacharse • ←→↑↓ girar</div>
+  </div>
+  <div id="bottom-right">
+    <div id="weapon-name">AK-47</div>
+    <div id="ammo"><span id="mag">30</span><span id="sep">/</span><span id="reserve">90</span></div>
+    <div id="slots"><span data-s="0" class="slot active">1</span><span data-s="1" class="slot">2</span><span data-s="2" class="slot">3</span></div>
+    <div id="nade-bar"></div>
+    <div id="reload-hint">R recargar • Click der. apuntar • Q cambiar</div>
+  </div>
+  <canvas id="minimap" width="150" height="150"></canvas>
+  <div id="killfeed"></div>
+  <div id="message"></div>
+</div>
+
+<!-- Controles táctiles -->
+<div id="touchUI" class="hidden">
+  <div id="joy"><div id="knob"></div></div>
+  <div id="touchBtns">
+    <button id="btnADS">APUNTAR</button>
+    <button id="btnJump">SALTO</button>
+    <button id="btnReload">RECARGAR</button>
+    <button id="btnNade">ARROJAR</button>
+  </div>
+  <button id="btnFire">FUEGO</button>
+</div>
+
+<!-- Menú -->
+<div id="menu">
+  <h1>STRIKE <span>REALISTA 3D</span></h1>
+  <p class="sub">FPS táctico en el navegador • Three.js + físicas + IA • Sin descargas</p>
+
+  <div id="tabs">
+    <button class="tab-btn active" data-tab="play">▶<span>JUGAR</span><small>Resumen y ajustes</small></button>
+    <button class="tab-btn" data-tab="maps">🗺️<span>MAPAS</span><small id="tabMapName">Distrito Centro</small></button>
+    <button class="tab-btn" data-tab="arsenal">🔫<span>ARSENAL</span><small id="tabArsName">AK-47 • Glock-17 • AWP</small></button>
+    <button class="tab-btn" data-tab="armory">🛠️<span>ARMERÍA</span><small>Miras y extras</small></button>
+    <button class="tab-btn" data-tab="controls">🎮<span>CONTROLES</span><small>Teclado, ratón y táctil</small></button>
+  </div>
+
+  <div id="tab-hint">Atajos: <b>1</b>–<b>5</b> cambian de apartado</div>
+
+  <div id="menuActions"><button id="playBtn2">▶ JUGAR</button></div>
+
+  <div id="tab-play" class="tab-panel active">
+    <div id="summary">
+      <div class="sum-row">🗺️ Mapa: <b id="sumMap">Distrito Centro</b></div>
+      <div class="sum-row">🎒 <span id="sumWeapons"></span></div>
+      <div class="sum-row">🛠️ <span id="sumAttach"></span></div>
+    </div>
+    <div class="sec-title">⚙️ AJUSTES — el ratón es opcional</div>
+    <div class="settings">
+      <label>Modo de mouse:
+        <select id="ctrlMode">
+          <option value="lock">Bloqueado (clásico FPS)</option>
+          <option value="drag">Libre (mover sin clic)</option>
+        </select>
+      </label>
+      <label>Sensibilidad: <input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"> <span id="sensVal">1.0</span></label>
+      <label><input id="invertY" type="checkbox"> Invertir eje Y</label>
+      <div class="hint">Sin mouse: usa <b>WASD + flechas ←→↑↓</b> para girar y <b>Enter</b> para disparar. En móvil hay joystick + botón FUEGO.</div>
+    </div>
+    <button id="playBtn">▶ JUGAR</button>
+    <div class="hint" style="margin-top:10px;font-size:12px;opacity:.7">📖 Todos los controles están en el apartado <b>CONTROLES</b> (tecla <b>5</b>).</div>
+    <div id="loading">Cargando motor 3D…</div>
+  </div>
+
+  <div id="tab-maps" class="tab-panel">
+    <div class="sec-title">🗺️ ELIGE EL MAPA — ciudad realista</div>
+    <div class="map-grid">
+      <button class="map-card active" data-map="downtown">🏙️<b>Distrito Centro</b><small>Calles, edificios, autos y semáforos. Día.</small></button>
+      <button class="map-card" data-map="port">🏗️<b>Puerto Industrial</b><small>Contenedores, grúas y bodegas. Atardecer.</small></button>
+      <button class="map-card" data-map="oldtown">⛪<b>Plaza Antigua</b><small>Europea: catedral, fuente y callejones. Mañana.</small></button>
+    </div>
+  </div>
+
+  <div id="tab-arsenal" class="tab-panel">
+    <div class="sec-title">🔫 ARSENAL — elige 1 de cada clase (12 armas)</div>
+    <div class="arm-cat">PRIMARIAS</div>
+    <div id="primList" class="arm-grid"></div>
+    <div class="arm-cat">SECUNDARIAS</div>
+    <div id="secList" class="arm-grid"></div>
+    <div class="arm-cat">FRANCOTIRADORES</div>
+    <div id="snipList" class="arm-grid"></div>
+    <div id="loadoutLine">🎒 Primaria: <b id="loPrim">AK-47</b> • Secundaria: <b id="loSec">Glock-17</b> • Sniper: <b id="loSnip">AWP</b></div>
+  </div>
+
+  <div id="tab-armory" class="tab-panel">
+    <div class="sec-title">🛠️ ARMERÍA — accesorios por arma (miras, bocas, tácticos)</div>
+    <div id="gunsmith"></div>
+  </div>
+
+  <div id="tab-controls" class="tab-panel">
+    <div class="sec-title">🎮 CONTROLES COMPLETOS — todo lo que puedes pulsar</div>
+
+    <div class="ctrl-cols">
+      <div class="ctrl-card">
+        <h4>🚶 Movimiento</h4>
+        <div class="ctrl-list">
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Mover</span></div>
+          <div><kbd>Mayús</kbd><span>Esprintar</span></div>
+          <div><kbd>C</kbd><span>Agacharse (más preciso)</span></div>
+          <div><kbd>Espacio</kbd><span>Saltar</span></div>
+        </div>
+      </div>
+
+      <div class="ctrl-card">
+        <h4>🎯 Mirar y disparar</h4>
+        <div class="ctrl-list">
+          <div><kbd>Ratón</kbd><span>Mirar</span></div>
+          <div><kbd>← → ↑ ↓</kbd><span>Mirar sin ratón</span></div>
+          <div><kbd>Click izq.</kbd><span>Disparar</span></div>
+          <div><kbd>Enter</kbd><span>Disparar (sin ratón)</span></div>
+          <div><kbd>Click der.</kbd><span>Apuntar (ADS)</span></div>
+          <div><kbd>R</kbd><span>Recargar</span></div>
+        </div>
+      </div>
+
+      <div class="ctrl-card">
+        <h4>🔫 Armas y perchas</h4>
+        <div class="ctrl-list">
+          <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>Cambiar de arma</span></div>
+          <div><kbd>Q</kbd><span>Siguiente arma</span></div>
+        </div>
+        <h4 class="mt">💣 Arrojadizos</h4>
+        <div class="ctrl-list">
+          <div><kbd>4</kbd><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><span>Elegir arrojadizo</span></div>
+          <div><kbd>F</kbd><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><span>Elegir (alternativa)</span></div>
+          <div><kbd>G</kbd><span>Lanzar (o <kbd>X</kbd>)</span></div>
+        </div>
+      </div>
+
+      <div class="ctrl-card">
+        <h4>⚙️ Sistema</h4>
+        <div class="ctrl-list">
+          <div><kbd>Esc</kbd><span>Pausa / continuar</span></div>
+          <div><kbd>Pausa</kbd><span>Reiniciar la partida</span></div>
+        </div>
+        <h4 class="mt">📱 Táctil (móvil)</h4>
+        <div class="ctrl-list">
+          <div><kbd>Joystick</kbd><span>Mover</span></div>
+          <div><kbd>FUEGO</kbd><span>Disparar</span></div>
+          <div><kbd>APUNTAR</kbd><span>ADS</span></div>
+          <div><kbd>SALTO</kbd><span>Saltar</span></div>
+          <div><kbd>RECARGAR</kbd><span>Recargar</span></div>
+          <div><kbd>ARROJAR</kbd><span>Lanzar arrojadizo</span></div>
+          <div><kbd>Pantalla</kbd><span>Mirar (desliza)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-tips">
+      <div class="sec-title">💡 Tips</div>
+      <ul>
+        <li><b>Agáchate</b> y <b>apunta</b> para dispersar mucho menos, sobre todo con rifles.</li>
+        <li>Con <b>bípode</b> + agachado + <b>corrector de culata</b> el retroceso casi desaparece.</li>
+        <li>Las <b>miras x8</b> y <b>térmica</b> son casi inútiles sin apuntar: úsalas con <b>Click der.</b>.</li>
+        <li>El <b>supresor pesado</b> reduce el ruido: los enemigos tardan mucho más en detectarte.</li>
+        <li>El <b>freno de boca</b> y el <b>choke</b> casi anulan el <i>subrayado de arma</i> al disparar.</li>
+        <li>Las <b>balas trazadoras</b> delatan tu posición a larga distancia: entra con <b>MP5</b> o usa <b>supresor</b>.</li>
+        <li><b>Humo</b> corta la visión enemiga, <b>apagallamas</b> los ciega y el <b>molotov</b> quema el suelo.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="hidden">
+  <h2>PAUSA</h2>
+  <p>Haz clic para continuar</p>
+  <button id="resumeBtn">Continuar</button>
+  <button id="restartBtn2" class="ghost">Reiniciar</button>
+</div>
+
+<div id="gameover" class="hidden">
+  <h2 id="go-title">HAS CAÍDO</h2>
+  <p id="go-stats"></p>
+  <button id="restartBtn">Reintentar</button>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
